@@ -1,16 +1,10 @@
 #!/bin/bash
 
-# ###
-# # Инициализируем бд
-# ###
+echo
+echo "Init config server"
+echo
 
-green=$(tput setaf 2)
-normal=$(tput sgr0)
-
-
-printf "${green}\n\nInit configSrv...\n${normal}"
-
-docker compose exec -T configSrv mongosh --quiet --port 27003 <<EOF
+while ! mongosh --quiet --host configSrv --port 27003 <<EOF
 rs.initiate(
     {
         _id : "config_server",
@@ -21,17 +15,17 @@ rs.initiate(
     }
 );
 EOF
+do
+    echo waiting 1s
+    sleep 1
+done
 
 
+echo
+echo "Init shard #1"
+echo
 
-printf "${green}\n\nSleep 5s...\n${normal}"
-
-sleep 5
-
-
-printf "${green}\n\nInit shard #1...\n${normal}"
-
-docker compose exec -T shard11 mongosh --quiet --port 27011 <<EOF
+while ! mongosh --host shard11 --quiet --port 27011 <<EOF
 rs.initiate(
     {
         _id : "rs0",
@@ -44,12 +38,16 @@ rs.initiate(
     }
 );
 EOF
+do
+    echo waiting 1s
+    sleep 1
+done
 
+echo
+echo "Init shard #2"
+echo
 
-
-printf "${green}\n\nInit shard #2...\n${normal}"
-
-docker compose exec -T shard21 mongosh --quiet --port 27021 <<EOF
+while ! mongosh --host shard21 --quiet --port 27021 <<EOF
 rs.initiate(
     {
         _id : "rs1",
@@ -62,15 +60,25 @@ rs.initiate(
     }
 );
 EOF
+do
+    echo waiting 1s
+    sleep 1
+done
 
-printf "${green}Init router...\n${normal}"
 
+echo
+echo Init router
+echo
 
-docker compose exec -T mongos_router mongosh --quiet  --port 27004 <<EOF
+while ! mongosh --host mongos_router --quiet  --port 27004 <<EOF
 sh.addShard("rs0/shard11:27011");
 sh.addShard("rs1/shard21:27021");
 
 sh.enableSharding("megadb");
 sh.shardCollection("megadb.helloDoc", { "name" : "hashed" } )
 EOF
+do
+    echo waiting 1s
+    sleep 1
+done
 
